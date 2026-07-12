@@ -19,7 +19,7 @@
 --manOFF: green;
 --manON: red;
 --manwhite: white;
-
+--mantext: floralwhite;
 }
 .tabnamestyle{
 position:relative;
@@ -169,14 +169,14 @@ HOME APPLIANCE CONTROL SYSTEM
 			<h2 class="heading" style="width:400px;">Control Panel</h2>
 			<div class="arrangeSidebySide" style="margin-left:4vw; gap: 5vw;">
 				<div id="ButtonControls" class="arrangeVertically">
-					<label for="AppControl">Power Control</label>
+					<label for="AppControl">Manual Power Switch</label>
 					<button id="AppControl" class="butStyl"><p id="AppControlCircle" class="butstylcircle">ON</p></button>
 					<div id="DeviceAccess" class="arrangeVertically" style="margin-top:4vw;" >
 						<label for="DeviceModeSelect">Appliance Mode</label>
 						<select id="DeviceModeSelect" class="butStyl"> 
-							<option>MANUAL_SAFE(Not Supported)</option>
-							<option>AUTO_NORMAL(Not Supported)</option>
-							<option>AUTO_AI(Not Supported)</option>
+							<option>MANUAL_SAFE</option>
+							<option>AUTO_NORMAL</option>
+							<option>AUTO_AI</option>
 							<option>MANUAL_OVERRIDE</option>
 							<option >Select one</option>
 						</select>
@@ -205,7 +205,7 @@ HOME APPLIANCE CONTROL SYSTEM
 			<h2 class="heading">Usage and Live Status</h2>
 			<div id="Live" class="arrangeVertically grouping">
 				<h3 class="heading" style="width:300px;">LiveStatus</h3>
-				<span id="LiveStatus" style="color:var(--manbackground)">Get the Device Status here</span>
+				<span id="LiveStatus" style="color:var(--mantext); font-size: medium; font-family: Calibri; font-weight: bold;">Get the Device Status here</span>
 			</div>
 			
 		</div>
@@ -222,26 +222,32 @@ HOME APPLIANCE CONTROL SYSTEM
   const mc_webReadHistory      = "https://dweet.cc/get/dweets/for/";
   const mc_webReadLatest       = "https://dweet.cc/get/latest/dweet/for/";
   const mc_webWriteAll         = "https://dweet.cc/dweet/for/";
-  const mc_webpage_HS          = "manuthing";
-  const mc_webpage_BR          = "BrowserReadOnlyData";
-  const mc_webpage_DC          = "DeviceConfig";
+  const HR_DRW                 = 0;
+  const DC                     = 1;
+  const BR                     = 2;
+  const mc_webpage_HS          = "manuthing"; //0
+  const mc_webpage_BR          = "BrowserReadOnly";//"BrowserReadOnlyData";//1
+  const mc_webpage_DC          = "DeviceConfig";//"DeviceConfig"; //2
   const mc_webpage_DRW         = "DeviceReadWrite";
   let m_countSecs 			   = 0; //Countsecs for Browser tasks scheduling and timeout management
   let m_appliance_state 	   = 0; //Local variable to store the appliance state for UI sync and write management
   let m_date 				   = "";
   //eg.:Dweet command: PING=L&LBA=2026-06-05 08:52:10&SBD=GME_1950
-  let m_WebThings_HS_KeyPair   = { PING: "", LBA: "", SBD: "" };
+  //BRACTV=7&LBA=2026-06-27 09:09:04&DEVACTV=3&LDDT=2026-06-27 09:19:04&SBD=GME_1950&TIMER=2147483719&SCH_START=3920003528&SCH_DURATION=2147483737&RECUR_HRS=2147483735&MCON_REQ=2147483649&DEV_OPMODE=2147483651
+  let m_WebThings_HS_KeyPair   = { BRACTV: "", LBA: "",DEVACTV: "",LDDT: "", SBD: "", LER: ""};
+  let m_WebThings_DRW_KeyPair  = { TIMER: "", SCH_START: "", SCH_DURATION: "", RECUR_HRS: "", MCON_REQ: "", DEV_OPMODE: ""};
+ //WFPW=mugimaga12&WFID=GMEplus 2G&WFAP=WM_IOT&WAPS=****&DEVID=GME_1950&FWV=FWVersion-1.0.0 Build:542&BUILD_DATE=Jun 28 2026 09:22:04&BR_MSG_CHATS= 
   let m_WebThings_DC_KeyPair   = { WFPW: "", WFID: "", WFAP: "", WAPS: "" , DEVID: "", FWV: "", BUILD_DATE: "", BR_MSG_CHATS: ""};
   // eg.: Dweet command: TIMER=2147483719&SCH_START=3920003528&SCH_DURATION=2147483737&RECUR_HRS=2147483735&MCON_REQ=2147483649&DEV_OPMODE=2147483651
-  let m_WebThings_BR_KeyPair   = { STARTUP: "", ERROR_COUNT: "", CONSUMED_WATER: "", INLET_WATER: "", WL1: "", WL2: "", MS: "", LDDT: "", LEC: "", LER: "", DEV_MSG_CHATS: ""};
-
-  let m_WebThings_DRW_KeyPair  = { TIMER: "", SCH_START: "", SCH_DURATION: "", RECUR_HRS: "", MCON_REQ: "", DEV_OPMODE: ""};
+  let m_WebThings_BR_KeyPair   = { STARTUP: "", ERROR_COUNT: "", CONSUMED_WATER: "", INLET_WATER: "", WL1: "", WL2: "", MS: "", LEC: "", DEV_MSG_CHATS: ""};
+  let lockRead 				   = 0; // 	To prevent UI update when user is providing the command
+  //let m_WebThings_DRW_KeyPair  = { };
   let mc_WebThingsmap          = 
   {
-	[mc_webpage_HS]			   : m_WebThings_HS_KeyPair, 
+	[mc_webpage_HS]			   : m_WebThings_HS_KeyPair,
+	[mc_webpage_DRW]	       : m_WebThings_DRW_KeyPair,
 	[mc_webpage_DC]			   : m_WebThings_DC_KeyPair, 
-	[mc_webpage_BR]		       : m_WebThings_BR_KeyPair, 
-	[mc_webpage_DRW]		   : m_WebThings_DRW_KeyPair
+	[mc_webpage_BR]		       : m_WebThings_BR_KeyPair
   };
   let m_isChangeOngoing 	   = false; //To manage the ongoing change of the slider value and avoid multiple writes to the device until user has finalized the value by letting go of the slider
   //Event Listeners
@@ -259,17 +265,19 @@ HOME APPLIANCE CONTROL SYSTEM
   const mc_History			   = document.getElementById("History");
   const mc_Submit 			   = document.getElementById("Submit");
   const mc_bodyClass		   = document.getElementById("bodyclass");
-
+  const mc_BasicControl        = document.getElementById("BasicControl");
   mc_AppControlCircle.innerText = "OFF";
   mc_ButtonControls.addEventListener("click", () => DeviceOperate("AppControl"));
   mc_DeviceModeSelect.addEventListener("input", () => DeviceOperate("DeviceModeSelect"));
-  mc_Timer.addEventListener("input", () => DeviceOperate("Offtimeslider"));
+  mc_Timer.addEventListener("input", () => DeviceOperate("OfftimesliderTextUpdate"));
+  mc_Timer.addEventListener("change", () => DeviceOperate("Offtimeslider"));
   mc_LiveStatus.addEventListener("click", () => DeviceOperate("LiveStatus"));
   mc_StartDate.addEventListener("change", () => DeviceOperate("startDate"));
   mc_Duration.addEventListener("change", () => DeviceOperate("duration"));
   mc_Recurring.addEventListener("change", () => DeviceOperate("recurring"));
   mc_Submit.addEventListener("click", () => DeviceOperate("Submit"));
-
+  mc_BasicControl.addEventListener("focusin", () => DeviceOperate("ControlFocIN"));
+  mc_BasicControl.addEventListener("focusout", () => DeviceOperate("ControlFocOUT"));
   //Localfunctions
   async function init()
   {
@@ -277,22 +285,27 @@ HOME APPLIANCE CONTROL SYSTEM
 	  //Fetch the WebThings data and store in local variables
 	  //fetchBrPhoneMac(); //Already called in the fetch device
 	  //Fetch and Release Lock to indicate Device that an user has come online
-	  if (await FetchDeviceWriteAccessLock(mc_webpage_HS)) { //To set the SBD to FREE in case it was locked by some other browser in the previous session and to set the LBA to current time to avoid stale lock situation
-		  await ReleaseDeviceWriteAccessLock(); //To release the lock immediately after acquiring to make the device available for writes from this browser session. This is done to avoid the situation where the device is locked by this browser session due to some error and is not released for other sessions.
-	  }
-	  let retval = await ReadThings();
+	  let retval = await ReadThings(mc_webpage_HS); 
+	  retval = await ReadThings(mc_webpage_DRW); 
+	  retval = await ReadThings(mc_webpage_DC);
+	  retval = await ReadThings(mc_webpage_BR);
+	  //if (await FetchDeviceWriteAccessLock(mc_webpage_HS)) { //To set the SBD to FREE in case it was locked by some other browser in the previous session and to set the LBA to current time to avoid stale lock situation
+	//	  await ReleaseDeviceWriteAccessLock(); //To release the lock immediately after acquiring to make the device available for writes from this browser session. This is done to avoid the situation where the device is locked by this browser session due to some error and is not released for other sessions.
+	  //}
 	  //sync Device state
-	  //logChatBox("Initialization ReadThings retval: " + mc_WebThingsmap[mc_webpage_DRW]["MCON_REQ"]);
+
+	  //logChatBox("Initialization ReadThings retval: " + mc_WebThingsmap[mc_webpage_HS]["MCON_REQ"]);
 	  m_appliance_state = formatData(mc_WebThingsmap[mc_webpage_DRW]["MCON_REQ"], "MCON_REQ", "Read");
 	  //logChatBox("m_appliance_state: " + m_appliance_state);
 	  UI_Init();
+	  setTimeout(Scheduler, 1000);
   }
   function logChatBox(msg, type = "Info")
   {
 	const date_new = provideDateTime("Date");
 	const time = provideDateTime("Time");
 
-	if(m_date === date_new )
+	if(m_date === date_new)
 	{
 		
 	}
@@ -448,11 +461,12 @@ function formatData(value, key, operation)
 }
 
 /*******************************START_WRITE***********************************/
- async function WriteToDevice(webtopic){
-	if (await FetchDeviceWriteAccessLock(webtopic) === true){
-		WriteAThing2Device(webtopic);
+ async function WriteToDevice(webtopic, triggerDeviceRead = true){
+	if (await FetchDeviceWriteAccessLock(webtopic,triggerDeviceRead) === true){
+		if(webtopic != mc_webpage_HS) {WriteAThing2Device(webtopic);} /*Skip as the read is already completed during lock acq*/
 		logChatBox("WriteOk");
 		await ReleaseDeviceWriteAccessLock();
+		lockRead = 0;
 	}
 	else{
 		//logChatBox("WriteNotOk or Busy");
@@ -460,16 +474,16 @@ function formatData(value, key, operation)
 	}
  }
  async function WriteAThing2Device(webtopic){
-	
+
 	for(thing in mc_WebThingsmap)
 	{
 		if(("" === webtopic) || (webtopic === thing)){
 			let payload = "";
 			for(key in mc_WebThingsmap[thing]){
-				payload += key +"=" +mc_WebThingsmap[thing][key] + "&";
+				payload += key + "=" + mc_WebThingsmap[thing][key] + "&";
 			}
 			logChatBox(mc_webWriteAll+webtopic+ "?"+payload);
-			const response = await fetch(mc_webWriteAll+webtopic+ "?"+payload)
+			const response = await fetch(mc_webWriteAll+webtopic+ "?"+payload);
 			if(response.ok){
 				logChatBox("Successfully wrote to the device");
 			}
@@ -480,18 +494,24 @@ function formatData(value, key, operation)
 		}
 	}
  }
- async function FetchDeviceWriteAccessLock(webtopic){
+ async function FetchDeviceWriteAccessLock(webtopic, triggerDeviceRead = true){
 	//Step 1 : Check if device is Free or same MAC
 	//Step 2 : If not then check if device or Browser- followd by check the last access time
 	//Step 3 : If more than 2mins then force relase the lock by overwritting the user MAC
 	//Step 4 : If not then wait/hold the request for the release for 15sec and then reject the request with error
 	let retval = await ReadThings(mc_webpage_HS,"SBD");
-	logChatBox("readval SBD:" + mc_WebThingsmap[mc_webpage_HS]["SBD"] + retval)
+	logChatBox("readval SBD:" + mc_WebThingsmap[mc_webpage_HS]["SBD"] + retval);
 	let device_write = "STOP"; //IMMEDIATE, STOP, QUEUED check if free until timeout
 	const current_time = new Date(provideDateTime("DateTime"));
 
 	let UUID = fetchBrPhoneMac();
-
+	// fetch the index and set bit of the corresponding thing/webtopic that the Device should read
+	if(triggerDeviceRead)
+	{
+		mc_WebThingsmap[mc_webpage_HS]["BRACTV"] = mc_WebThingsmap[mc_webpage_HS]["BRACTV"] | (1<< Object.keys(mc_WebThingsmap).indexOf(webtopic));
+		//logChatBox("Activity bit status: " + mc_WebThingsmap[mc_webpage_HS]["BRACTV"] );
+	}
+	//logChatBox(webtopic+ " Element ID: " + Object.keys(mc_WebThingsmap).indexOf(webtopic));
 	//All okay proceed to write
 	if ((retval == true) && ((mc_WebThingsmap[mc_webpage_HS]["SBD"] === "FREE") || (mc_WebThingsmap[mc_webpage_HS]["SBD"] === UUID))){
 		logChatBox("Device is free or locked by same browser, proceeding to write" +mc_WebThingsmap[mc_webpage_HS]["SBD"]);
@@ -499,9 +519,9 @@ function formatData(value, key, operation)
 	}
 	//Device has aquired lock eg.: PING=L&LBA=2026-06-05 08:52:10&SBD=GME_1950
 	else if((retval == true) && (mc_WebThingsmap[mc_webpage_HS]["SBD"] == "GME_1950")){
-		await ReadThings(mc_webpage_BR,"LDDT");
-        
-		let date1 = new Date(mc_WebThingsmap[mc_webpage_BR]["LDDT"]);
+		await ReadThings(mc_webpage_HS,"LDDT");
+
+		let date1 = new Date(mc_WebThingsmap[mc_webpage_HS]["LDDT"]);
 		
 		//const isValidDate = date1 instanceof Date && !isNaN(last_access_time);
 
@@ -519,6 +539,7 @@ function formatData(value, key, operation)
 	}
 	//Some other browser request ongoing
 	else if((retval == true) && (mc_WebThingsmap[mc_webpage_HS]["SBD"] != "FREE")){
+		//await ReadThings(mc_webpage_HS,"LBA"); //Let the be fixed time start value so any user cannot even lock intentionally the access
 		const last_access_time = new Date(mc_WebThingsmap[mc_webpage_HS]["LBA"]);
 		const time_diff = (current_time - last_access_time)/1000; //in seconds
 		logChatBox("Usage time diff:" + time_diff ,"Err");
@@ -552,10 +573,11 @@ function formatData(value, key, operation)
 			setTimeout(() => {
 			    document.body.setAttribute('inert','');
 				mc_bodyClass.classList.add("freeze");
-				return WriteToDevice(webtopic);
+				return WriteToDevice(webtopic,triggerDeviceRead);
 			}, 15000);
 			logChatBox("Device is busy due to another ongoing request. Your request is queued do not close this window.");
 			retval = false;
+			lockRead = 2;
 			break;
 		case "STOP":
 			logChatBox("Error due to missing keys in the HS thing,therefore Forcing Writting ","Err");
@@ -565,15 +587,16 @@ function formatData(value, key, operation)
 		default:
 			logChatBox("Error While writting unhandled case" + device_write,"Err");
 			retval = false;
+			lockRead = 0;
 	}
 	return retval;
  }
  async function ReleaseDeviceWriteAccessLock(){
-	if(await ReadThings(mc_webpage_HS,"SBD") == true)
+	if(await ReadThings(mc_webpage_HS) == true)
 	{
 		let UUID = fetchBrPhoneMac();
 		if(mc_WebThingsmap[mc_webpage_HS]["SBD"] === UUID){
-			logChatBox("Device lock -already aquired");
+			logChatBox("Device lock - already aquired");
 		}else{
 			logChatBox("Device lock is takenbyForce by Device","Err");
 		}
@@ -606,21 +629,47 @@ function formatData(value, key, operation)
  }
  /*******************************END_WRITE***********************************/
  //Scheduling functions
- setTimeout(Scheduler, 1000);
  async function Scheduler(){
 	m_countSecs++;
-	setTimeout(Scheduler, 1000);
 	if((m_countSecs % 5) === 0) 
 	{
 		//5secs tasks
-		if(m_isChangeOngoing === true){
-			m_isChangeOngoing = false; //Reset the change ongoing flag every 1 sec to allow new changes to be written to the device
-			console.log("User let go! Final value is:", mc_Timer.value);
-			WriteToDevice(mc_webpage_DRW);
-		}
+		//ASYNC timer value write to prevent frequent changing while user moves slider
+		//if(m_isChangeOngoing === true){
+		//	m_isChangeOngoing = false; //Reset the change ongoing flag every 1 sec to allow new changes to be written to the device
+		//	console.log("User let go! Final value is:", mc_Timer.value);
+		//	WriteToDevice(mc_webpage_HS,false);
+		//}
 		if((m_countSecs % 10) === 0)
-		{await UI_Init();}
+		{   
+			if (lockRead == 0)
+			{
+				logChatBox("Scheduler ReadThings for HS and DRW");
+				await ReadThings(mc_webpage_HS);
+				if(mc_WebThingsmap[mc_webpage_HS]["DEVACTV"] > 0) 
+				{
+					await ReadThings();
+					//optionalprocessEvents(mc_WebThingsmap[mc_webpage_HS]["LER"]);
+					if(mc_WebThingsmap[mc_webpage_HS]["SBD"] = "FREE")
+					{
+						/* Device has fininshed writting so latest data is read by the broswer so clear this */
+						mc_WebThingsmap[mc_webpage_HS]["DEVACTV"] = 0;
+						await WriteToDevice(mc_webpage_HS, false)
+					}
+				}
+				m_appliance_state = formatData(mc_WebThingsmap[mc_webpage_DRW]["MCON_REQ"], "MCON_REQ", "Read");
+				await UI_Init();
+			}
+			//else{logChatBox("User Accessing Browser in progress");}
+		}
 	}
+	setTimeout(Scheduler, 1000);
+ }
+ function optionalprocessKey(events)
+ {
+	let appliance_Status = (events & 0xE);
+
+	logChatBox("Parsed Event value: " + events)
  }
 async function DeviceOperate(id)
 {
@@ -631,11 +680,11 @@ async function DeviceOperate(id)
 		{
 			if (m_appliance_state == 0){
 				m_appliance_state = 1;}
-			else{
+			else{ 
 				m_appliance_state = 0;
 			}
 			mc_WebThingsmap[mc_webpage_DRW]["MCON_REQ"] = formatData(m_appliance_state, "MCON_REQ", "Write");
-			logChatBox("Device Control Request: " + m_appliance_state);
+			logChatBox("Device Control Request: " + m_appliance_state); 
 			await WriteToDevice(mc_webpage_DRW);
 		}
 		case "AppControl_UI":
@@ -645,32 +694,42 @@ async function DeviceOperate(id)
 		case "DeviceModeSelect":
 			mc_WebThingsmap[mc_webpage_DRW]["DEV_OPMODE"] = formatData(mc_DeviceModeSelect.selectedIndex, "DEV_OPMODE", "Write");
 			logChatBox("Mode: "+mc_DeviceModeSelect.selectedIndex+" Request");
+			
 			await WriteToDevice(mc_webpage_DRW);
 		break;
 		case "Offtimeslider":
 			mc_WebThingsmap[mc_webpage_DRW]["TIMER"] = formatData(mc_Timer.value, "TIMER", "Write");
+			logChatBox("Timer val is "+ mc_WebThingsmap[mc_webpage_DRW]["TIMER"]);
+            WriteToDevice(mc_webpage_DRW);
+
+		case "OfftimesliderTextUpdate":
 			mc_Timertext.innerHTML=mc_Timer.value;
-			m_isChangeOngoing = true; //Set the change ongoing flag to true when user is changing the slider value to avoid multiple writes to the device until user has finalized the value by letting go of the slider
+			//mc_WebThingsmap[mc_webpage_DRW]["BRACTV"] = mc_WebThingsmap[mc_webpage_DRW]["BRACTV"] | (1<< HR_DRW);
+			//m_isChangeOngoing = true; //Set the change ongoing flag to true when user is changing the slider value to avoid multiple writes to the device until user has finalized the value by letting go of the slider
 		break;
 		case "startDate":
 			//let a = String(mc_StartDate.value).replace("T", " ");
 			logChatBox("Selected DateTime is "+mc_StartDate.value);
 			mc_WebThingsmap[mc_webpage_DRW]["SCH_START"] = formatData(mc_StartDate.value, "SCH_START", "Write");
 			mc_StartDate.innerHTML= provideDateTime(mc_StartDate.value);//new Date(mc_StartDate.value).toLocaleDateString();
+			//mc_WebThingsmap[mc_webpage_HS]["BRACTV"] = mc_WebThingsmap[mc_webpage_HS]["BRACTV"] | (1<< HR_DRW);
 			await WriteToDevice(mc_webpage_DRW);
 		break;
 		case "duration":
 			mc_WebThingsmap[mc_webpage_DRW]["SCH_DURATION"] = formatData(mc_Duration.value, "SCH_DURATION", "Write");
 			mc_Duration.innerHTML=mc_Duration.value;
+			//mc_WebThingsmap[mc_webpage_HS]["BRACTV"] = mc_WebThingsmap[mc_webpage_HS]["BRACTV"] | (1<< HR_DRW);
 			await WriteToDevice(mc_webpage_DRW);
 		break;
 		case "recurring":
 			mc_WebThingsmap[mc_webpage_DRW]["RECUR_HRS"] = formatData(mc_Recurring.value, "RECUR_HRS", "Write");
 			mc_Recurring.innerHTML=mc_Recurring.value;
+			//mc_WebThingsmap[mc_webpage_HS]["BRACTV"] = mc_WebThingsmap[mc_webpage_HS]["BRACTV"] | (1<< HR_DRW);
 			await WriteToDevice(mc_webpage_DRW);
 		break;
 		case "LiveStatus":
 			mc_LiveStatus.style.backgroundColor = "var(--manbackground)";
+			mc_LiveStatus.style.backgroundColor = "var(--manwhite)";
 			await ReadThings();
 			await LiveStatusUpdate();
 			setTimeout(() => {
@@ -678,13 +737,21 @@ async function DeviceOperate(id)
 			}, 250);
 		break;
 		case "Submit":
-			mc_WebThingsmap[mc_webpage_DRW]["BR_MSG_CHATS"] += mc_Typebox.value; //TBI History and Device Store and retireve messages
+			mc_WebThingsmap[mc_webpage_DC]["BR_MSG_CHATS"] += mc_Typebox.value; //TBI History and Device Store and retireve messages
 			logChatBox(mc_Typebox.value,"|REQ:");
-			mc_WebThingsmap[mc_webpage_DC]["BR_MSG_CHATS"] = formatData("|REQ:"+mc_Typebox.value, "BR_MSG_CHATS", "Write"); //Dummy write to trigger the device to read the new message from the BrowserReadWrite thing. Can be replaced by a dedicated key for chats in future.
+			//mc_WebThingsmap[mc_webpage_DC]["BR_MSG_CHATS"] = formatData("|REQ:"+mc_Typebox.value, "BR_MSG_CHATS", "Write"); //Dummy write to trigger the device to read the new message from the BrowserReadWrite thing. Can be replaced by a dedicated key for chats in future.
 			await WriteToDevice(mc_webpage_DC);
 			mc_Typebox.value = "";
 			//senddata("temp","09");
 			//fetchdata();
+		break;
+		case "ControlFocOUT":
+            logChatBox("FocusOUT Hit");
+			if(lockRead == 1) {lockRead = 0;}
+		break;
+		case "ControlFocIN":
+			lockRead = 1;
+            logChatBox("FocusIN Hit");
 		break;
 		default:
 		break;
@@ -692,48 +759,48 @@ async function DeviceOperate(id)
 }
 function UI_Init()
 {
-    //This function can be used to update the UI based on the latest values of the local variables which are updated by reading from the webthings. This function can be called after every successful read operation or can be scheduled to run at regular intervals based on the requirements.
-	if(m_appliance_state == 1){
-		mc_AppControlCircle.classList.add("on");
-		mc_AppControlCircle.style.backgroundColor = "var(--manON)";
-		mc_AppControlCircle.innerText = "ON";
-	}
-	else{
-		mc_AppControlCircle.classList.remove("on");
-		mc_AppControlCircle.style.backgroundColor = "var(--manOFF)";
-		mc_AppControlCircle.innerText = "OFF";
-	}
-		const dt_setting = {
-		hourCycle: 'h23',
-		timeZone: 'Asia/Kolkata'
-	};
-	//logChatBox("schSTART IS " + mc_WebThingsmap[mc_webpage_DRW]["SCH_START"]);
-	mc_DeviceModeSelect.selectedIndex = formatData(mc_WebThingsmap[mc_webpage_DRW]["DEV_OPMODE"], "DEV_OPMODE", "Read");
-    mc_Timertext.innerHTML 		= formatData(mc_WebThingsmap[mc_webpage_DRW]["TIMER"], "TIMER", "Read");
-	mc_Timer.value 				= formatData(mc_WebThingsmap[mc_webpage_DRW]["TIMER"], "TIMER", "Read");
-	mc_StartDate.value 		= formatData(mc_WebThingsmap[mc_webpage_DRW]["SCH_START"], "SCH_START", "Read");
-	//mc_StartDate.value 		=  new Date(1718922731*1000).toISOString().slice(0, 16);
-	mc_Duration.value 		= formatData(mc_WebThingsmap[mc_webpage_DRW]["SCH_DURATION"], "SCH_DURATION", "Read");
-	mc_Recurring.value 		= formatData(mc_WebThingsmap[mc_webpage_DRW]["RECUR_HRS"], "RECUR_HRS", "Read");
-	DeviceVersionInfo();
-	LiveStatusUpdate();
+		//This function can be used to update the UI based on the latest values of the local variables which are updated by reading from the webthings. This function can be called after every successful read operation or can be scheduled to run at regular intervals based on the requirements.
+		if(m_appliance_state == 1){
+			mc_AppControlCircle.classList.add("on");
+			mc_AppControlCircle.style.backgroundColor = "var(--manON)";
+			mc_AppControlCircle.innerText = "ON";
+		}
+		else{
+			mc_AppControlCircle.classList.remove("on");
+			mc_AppControlCircle.style.backgroundColor = "var(--manOFF)";
+			mc_AppControlCircle.innerText = "OFF";
+		}
+			const dt_setting = {
+			hourCycle: 'h23',
+			timeZone: 'Asia/Kolkata'
+		};
+		//logChatBox("schSTART IS " + mc_WebThingsmap[mc_webpage_HS]["SCH_START"]);
+		mc_DeviceModeSelect.selectedIndex = formatData(mc_WebThingsmap[mc_webpage_DRW]["DEV_OPMODE"], "DEV_OPMODE", "Read");
+		mc_Timertext.innerHTML 		= formatData(mc_WebThingsmap[mc_webpage_DRW]["TIMER"], "TIMER", "Read");
+		mc_Timer.value 				= formatData(mc_WebThingsmap[mc_webpage_DRW]["TIMER"], "TIMER", "Read");
+		mc_StartDate.value 		= formatData(mc_WebThingsmap[mc_webpage_DRW]["SCH_START"], "SCH_START", "Read");
+		//mc_StartDate.value 		=  new Date(1718922731*1000).toISOString().slice(0, 16);
+		mc_Duration.value 		= formatData(mc_WebThingsmap[mc_webpage_DRW]["SCH_DURATION"], "SCH_DURATION", "Read");
+		mc_Recurring.value 		= formatData(mc_WebThingsmap[mc_webpage_DRW]["RECUR_HRS"], "RECUR_HRS", "Read");
+		DeviceVersionInfo();
+		LiveStatusUpdate();
 }
 function LiveStatusUpdate()
 {
 	//This function can be used to update the Live status section of the UI based on the latest values of the local variables which are updated by reading from the webthings. This function can be called after every successful read operation or can be scheduled to run at regular intervals based on the requirements.
 	mc_LiveStatus.innerHTML =
-	"APPLICANCE STATUS: " + formatData(mc_WebThingsmap[mc_webpage_BR]["MS"] == 1 ? "ON" : "OFF", "MS", "Read") + "<br>" +
+	"APPLIANCE ON/OFF: " + formatData((mc_WebThingsmap[mc_webpage_HS]["LER"] & 0xE) != 0 ? "ON" : "OFF", "MS", "Read") + "<br>" +
 	"TODAY'S CONSUMPTION: " + formatData(mc_WebThingsmap[mc_webpage_BR]["READ_CONSUMED_WATER"], "READ_CONSUMED_WATER", "Read") + "<br>" +
-	"CAUVERY/INCOMING STATUS " + formatData(mc_WebThingsmap[mc_webpage_BR]["INLET_WATER"], "INLET_WATER", "Read") + "<br>" +
-	"DEVICE WAS ONLINE @: " + formatData(mc_WebThingsmap[mc_webpage_BR]["LDDT"], "LDDT", "Read") + "<br>" +
+	"CAUVERY/INLET STATUS " + formatData(mc_WebThingsmap[mc_webpage_BR]["INLET_WATER"], "INLET_WATER", "Read") + "<br>" +
+	"DEVICE WAS ONLINE @: " + formatData(mc_WebThingsmap[mc_webpage_HS]["LDDT"], "LDDT", "Read") + "<br>" +
 	"DEVICE ERROR: " + formatData(mc_WebThingsmap[mc_webpage_BR]["LEC"], "LEC", "Read") + "<br>" +
-	"DEVICE EVENTS: " + formatData(mc_WebThingsmap[mc_webpage_BR]["LER"], "LER", "Read") + "<br>" +
+	"DEVICE EVENTS: " + formatData(mc_WebThingsmap[mc_webpage_HS]["LER"], "LER", "Read") + "<br>" +
 	"DEVICE WIFIHOTSPOT: " + formatData(mc_WebThingsmap[mc_webpage_DC]["WFAP"], "WFAP", "Read") + "<br>";
 }
 function DeviceVersionInfo()
 {
 	mc_Version.innerHTML = formatData(mc_WebThingsmap[mc_webpage_DC]["FWV"], "FWV", "Read") +
-	"(beta) Launched on:07.06.2026";
+	"(beta v2) Launched on:07.06.2026";
 	//+ formatData(mc_WebThingsmap[mc_webpage_DC]["BUILD_DATE"], "BUILD_DATE", "Read")
 }
 init();
